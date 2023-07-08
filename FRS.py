@@ -2,14 +2,15 @@ import torch
 from torch.utils.data import DataLoader
 import numpy as np
 from model import MFModel
-from dataset import ClientsDataset, ClientsSampler
+from dataset import TrainDataset, TestDataset, ClientsSampler
 
 class Clients:
     def __init__(self, args):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.clients_data = ClientsDataset()
-        self.n = self.clients_data.n
-        self.m = self.clients_data.m
+        self.trainData = TrainDataset()
+        self.testData = TestDataset()
+        self.n = self.trainData.n
+        self.m = self.trainData.m
         self.model = MFModel(self.n, self.m, args.hiddenDim)
         self.model.to(self.device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=args.lr)
@@ -24,7 +25,7 @@ class Clients:
             # 把 tensor 类型换成列表
             # list -> numpy -> tensor(torch.from_numpy) -> to(self.device)
             uid = uid.tolist()
-            clients_data_dict = dict([(k, torch.from_numpy(np.array(v)).float().to(self.device)) for k, v in self.clients_data[uid].items()])
+            clients_data_dict = dict([(k, torch.from_numpy(np.array(v)).float().to(self.device)) for k, v in self.trainData[uid].items()])
             scores = self.model(clients_data_dict)
             loss = self.model.loss_function(scores, clients_data_dict['ratings'])
             loss.backward()
