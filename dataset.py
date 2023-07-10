@@ -7,12 +7,15 @@ import torch
 from torch.utils.data import Dataset
 
 FilePath = "data/ml-latest-small/ratings.csv"
+FilePath2 = "data/ml-1m/ratings.dat"
 
 class TrainDataset(Dataset):
     def __init__(self):
         super().__init__()
         path = os.path.abspath(".")
-        data = pd.read_csv(os.path.join(path, FilePath))
+        # movieLens-1m dataset
+        data = pd.read_csv(os.path.join(path, FilePath2), sep='::', engine='python', header=None,
+                           names=['userId', 'movieId', 'rating', 'timestamp'])
         self.train_dataset, _ = train_test_split(data, test_size=0.2)
         self.n = self.train_dataset.userId.max()
         self.m = self.train_dataset.movieId.max()
@@ -36,7 +39,8 @@ class TestDataset(Dataset):
     def __init__(self):
         super().__init__()
         path = os.path.abspath(".")
-        data = pd.read_csv(os.path.join(path, FilePath))
+        data = pd.read_csv(os.path.join(path, FilePath2), sep='::', engine='python', header=None,
+                           names=['userId', 'movieId', 'rating', 'timestamp'])
         _, self.test_dataset = train_test_split(data, test_size=0.2)
         self.n = self.test_dataset.userId.max()
         self.m = self.test_dataset.movieId.max()
@@ -66,3 +70,17 @@ class ClientsSampler(Dataset):
 
     def __getitem__(self, idx):
         return self.users_seq[idx]
+
+# 测试对movieLens-1m的数据进行读取操作
+def readFile():
+    path = os.path.abspath(".")
+    data = pd.read_csv(os.path.join(path, FilePath2), sep='::', engine='python', header=None,
+                       names=['userId', 'movieId', 'rating', 'timestamp'])
+    print(data[:3])
+    train_dataset, test_dataset = train_test_split(data, test_size=0.2)
+    print(train_dataset.userId.max(), train_dataset.movieId.max())
+
+
+
+if __name__ == '__main__':
+    readFile()
