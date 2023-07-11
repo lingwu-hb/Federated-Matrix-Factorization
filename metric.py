@@ -1,6 +1,6 @@
 import numpy as np
 import bottleneck as bn
-
+from torchsummary import summary
 
 def NDCG_binary_at_k_batch(X_pred, heldout_batch, k=5):
     '''
@@ -52,3 +52,25 @@ def AUC_at_k_batch(X_train, X_pred, heldout_batch):
     denominator = (X_pred.shape[1] - train_set_num - test_set_num) * test_set_num
     aucs = molecular / denominator
     return aucs
+
+# 计算模型的大小
+def getModelSize(model):
+    param_size = 0
+    param_sum = 0
+    for param in model.parameters():
+        param_size += param.nelement() * param.element_size()
+        param_sum += param.nelement()
+    buffer_size = 0
+    buffer_sum = 0
+    for buffer in model.buffers():
+        buffer_size += buffer.nelement() * buffer.element_size()
+        buffer_sum += buffer.nelement()
+    all_size = (param_size + buffer_size) / 1024 / 1024
+    print('模型总大小为：{:.3f}MB'.format(all_size))
+    return (param_size, param_sum, buffer_size, buffer_sum, all_size)
+
+# 获得模型的计算量
+def getModelCal(model, batch_size, user_num, item_num):
+    # 打印模型的摘要信息，包括参数量和计算量
+    # TODO: summary函数的输入参数不正确！
+    summary(model, input_size=[(batch_size, user_num), (batch_size, item_num)])

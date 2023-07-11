@@ -8,13 +8,17 @@ from torch.utils.data import Dataset
 
 FilePath = "data/ml-latest-small/ratings.csv"
 FilePath2 = "data/ml-1m/ratings.dat"
+FilePath3 = "data/ml-100k/u1.test"
 
 class TrainDataset(Dataset):
     def __init__(self):
         super().__init__()
         path = os.path.abspath(".")
         # movieLens-1m dataset
-        data = pd.read_csv(os.path.join(path, FilePath2), sep='::', engine='python', header=None,
+        # data = pd.read_csv(os.path.join(path, FilePath2), sep='::', engine='python', header=None,
+        #                    names=['userId', 'movieId', 'rating', 'timestamp'])
+        # movieLens-100k dataset
+        data = pd.read_csv(os.path.join(path, FilePath3), sep='\t', engine='python', header=None,
                            names=['userId', 'movieId', 'rating', 'timestamp'])
         self.train_dataset, _ = train_test_split(data, test_size=0.2)
         self.n = self.train_dataset.userId.max()
@@ -39,7 +43,7 @@ class TestDataset(Dataset):
     def __init__(self):
         super().__init__()
         path = os.path.abspath(".")
-        data = pd.read_csv(os.path.join(path, FilePath2), sep='::', engine='python', header=None,
+        data = pd.read_csv(os.path.join(path, FilePath3), sep='\t', engine='python', header=None,
                            names=['userId', 'movieId', 'rating', 'timestamp'])
         _, self.test_dataset = train_test_split(data, test_size=0.2)
         self.n = self.test_dataset.userId.max()
@@ -71,16 +75,14 @@ class ClientsSampler(Dataset):
     def __getitem__(self, idx):
         return self.users_seq[idx]
 
-# 测试对movieLens-1m的数据进行读取操作
+# 测试对movieLens-100k的数据进行读取操作
 def readFile():
     path = os.path.abspath(".")
-    data = pd.read_csv(os.path.join(path, FilePath2), sep='::', engine='python', header=None,
+    data = pd.read_csv(os.path.join(path, FilePath3), sep='\t', engine='python', header=None,
                        names=['userId', 'movieId', 'rating', 'timestamp'])
     print(data[:3])
     train_dataset, test_dataset = train_test_split(data, test_size=0.2)
     print(train_dataset.userId.max(), train_dataset.movieId.max())
-
-
 
 if __name__ == '__main__':
     readFile()

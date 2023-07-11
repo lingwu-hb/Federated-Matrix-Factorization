@@ -25,5 +25,4 @@ def cenMFmain():
 
 if __name__ == '__main__':
     cenMFmain()
-    # print(torch.cuda.is_available())
 

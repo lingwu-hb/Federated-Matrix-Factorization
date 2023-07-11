@@ -29,7 +29,9 @@ class Clients:
             uid = uid.tolist()
             clients_data_dict = dict([(k, torch.from_numpy(np.array(v)).float().to(self.device))
                                       for k, v in self.trainData[uid].items()])
+            self.optimizer.zero_grad()
             scores = self.model(clients_data_dict)
+            # 需要对item进行更新
             loss = self.model.loss_function(scores, clients_data_dict['ratings'])
             loss.backward()
             self.optimizer.step()
