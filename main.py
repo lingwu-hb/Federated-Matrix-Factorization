@@ -1,5 +1,5 @@
 import torch.cuda
-
+import torch
 from parse import get_parse
 from utils import fix_seed
 from FRS import Clients, Server
@@ -21,7 +21,6 @@ def cenMFmain():
 
     cenMF = centralizedMF(args)
     cenMF.train()
-
 
 if __name__ == '__main__':
     cenMFmain()
