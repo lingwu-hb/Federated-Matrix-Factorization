@@ -44,6 +44,21 @@ class centralizedMF:
                 all_loss += loss.item()
             print('epoch%d - loss%f' % (epoch, all_loss / len(self.trainData)))
 
+        # 打印出预测值和真实值进行比较
+        prection = []
+        real_score = []
+        with torch.no_grad():
+            for batch in self.test_data:
+                batch_dict = dict([(k, v[0].float().to(self.device)) for k, v in batch.items()])
+                users = batch_dict['user'].int()
+                items = batch_dict['item'].int()
+                ratings = batch_dict['ratings']
+                scores = self.model({'user': users, 'item': items})
+                prection.append(scores.tolist())
+                real_score.append(ratings.tolist())
+            print("预测值为:", np.array(prection))
+            print("真实值为:", np.array(real_score))
+
         #     # evaluate phase
         #     ndcg5_list = []
         #     recall5_list = []
