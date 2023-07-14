@@ -16,13 +16,14 @@ class centralizedMF:
         self.early_stop = args.early_stop
         self.n = self.trainData.n
         self.m = self.trainData.m
+        self.hiddenDim = args.hiddenDim
         self.test_data = DataLoader(
             self.testData,
             batch_size=self.batch_size,
             num_workers=2,
             pin_memory=True,
             shuffle=False)
-        self.model = MFModel(self.n, self.m, args.hiddenDim)
+        self.model = MFModel(self.n, self.m, self.hiddenDim)
         self.model.to(self.device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=args.lr)
 
@@ -135,7 +136,7 @@ class centralizedMF:
 
         # calculate the calculated amount and size of the model
         getModelSize(self.model)
-        # getModelCal(self.model, self.batch_size, self.m, self.n)
+        getModelCal(self.m, self.n, self.hiddenDim)
 
 
 

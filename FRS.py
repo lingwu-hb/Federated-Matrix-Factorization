@@ -23,6 +23,7 @@ class Clients:
         self.model.load_state_dict(model_param_state_dict)
         # each client computes gradients using its private data
         clients_grads = {}
+        all_loss = 0
         for uid in uids:
             # 把 tensor 类型换成列表
             # list -> numpy -> tensor(torch.from_numpy) -> to(self.device)
@@ -35,11 +36,12 @@ class Clients:
             loss = self.model.loss_function(scores, clients_data_dict['ratings'])
             loss.backward()
             self.optimizer.step()
+            all_loss += loss.item()
             grad_u = {}
             for name, param in self.model.named_parameters():
                 grad_u[name] = param.grad.detach().clone()
             clients_grads[uid] = grad_u
-        return clients_grads
+        return clients_grads, all_loss
 
 class Server:
     def __init__(self, args, clients):
@@ -48,13 +50,16 @@ class Server:
         self.epochs = args.epochs
         self.batch_size = args.batch_size
         self.early_stop = args.early_stop
+        self.m = self.clients.m
+        self.n = self.clients.n
+        self.hiddenDim = args.hiddenDim
         self.test_data = DataLoader(
             self.clients.testData,
             batch_size=self.batch_size,
             num_workers=2,
             pin_memory=True,
             shuffle=False)
-        self.model = MFModel(self.clients.n, self.clients.m, args.hiddenDim)
+        self.model = MFModel(self.n, self.m, self.hiddenDim)
         self.model.to(self.device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=args.lr)
 
@@ -82,83 +87,105 @@ class Server:
         for epoch in range(self.epochs):
             # train phase
             self.model.train()
-            uid_seq = DataLoader(ClientsSampler(self.clients.n), batch_size=self.batch_size, shuffle=True)
+            all_loss = 0
+            uid_seq = DataLoader(ClientsSampler(self.n), batch_size=self.batch_size, shuffle=True)
             for uids in uid_seq:
                 # sample clients to train the model
                 self.optimizer.zero_grad()
                 # send the model to the clients and let them start training
-                clients_grads = self.clients.train(uids, self.model.state_dict())
+                clients_grads, loss = self.clients.train(uids, self.model.state_dict())
                 # aggregate the received gradients
                 self.aggregate_gradients(clients_grads)
                 # update the model
                 self.optimizer.step()
+                all_loss += loss
+            print('epoch%d - loss%f' % (epoch, all_loss / self.n))
 
-        #     # evaluate phase
-        #     ndcg5_list = []
-        #     recall5_list = []
-        #     precision5_list = []
-        #     f1_list = []
-        #     oneCall_list = []
-        #     auc_list = []
-        #
-        #     self.model.eval()
-        #     with torch.no_grad():
-        #         for batch in self.test_data:
-        #             batch_dict = dict([(k, torch.from_numpy(np.array(v)).float().to(self.device))
-        #                           for k, v in batch.items()])
-        #             users = batch_dict['user'].to(self.device)
-        #             items = batch_dict['item'].to(self.device)
-        #             ratings = batch_dict['ratings'].to(self.device)
-        #
-        #             scores = self.model({'user': users, 'item': items})
-        #             # scores[users, items] = -np.inf
-        #             # recon_batch = scores.cpu().numpy()
-        #             # ratings = ratings.cpu().numpy()
-        #
-        #             # n_5 = NDCG_binary_at_k_batch(recon_batch, ratings, 5)
-        #             n_5 = calculate_ndcg(scores, ratings, 5)
-        #             r_5, p_5, f_5, o_5 = Recall_Precision_F1_OneCall_at_k_batch(recon_batch, ratings, 5)
-        #             auc_b = AUC_at_k_batch(users.cpu().numpy(), recon_batch, ratings)
-        #
-        #             ndcg5_list.append(n_5)
-        #             recall5_list.append(r_5)
-        #             precision5_list.append(p_5)
-        #             f1_list.append(f_5)
-        #             oneCall_list.append(o_5)
-        #             auc_list.append(auc_b)
-        #
-        #     ndcg5_list = np.concatenate(ndcg5_list)
-        #     recall5_list = np.concatenate(recall5_list)
-        #     precision5_list = np.concatenate(precision5_list)
-        #     f1_list = np.concatenate(f1_list)
-        #     oneCall_list = np.concatenate(oneCall_list)
-        #     auc_list = np.concatenate(auc_list)
-        #
-        #     ndcg5_list[np.isnan(ndcg5_list)] = 0
-        #     ndcg5 = np.mean(ndcg5_list)
-        #     recall5_list[np.isnan(recall5_list)] = 0
-        #     recall5 = np.mean(recall5_list)
-        #     precision5_list[np.isnan(precision5_list)] = 0
-        #     precision5 = np.mean(precision5_list)
-        #     f1_list[np.isnan(f1_list)] = 0
-        #     f1 = np.mean(f1_list)
-        #     oneCall_list[np.isnan(oneCall_list)] = 0
-        #     oneCAll = np.mean(oneCall_list)
-        #     auc_list[np.isnan(auc_list)] = 0
-        #     auc = np.mean(auc_list)
-        #
-        #     print(
-        #         "Epoch: {:3d} | Pre@5: {:5.4f} | Rec@5: {:5.4f} | F1@5: {:5.4f} | NDCG@5: {:5.4f} | 1-call@5: {:5.4f} | AUC: {:5.4f}".format(
-        #             epoch + 1, precision5, recall5, f1, ndcg5, oneCAll, auc), flush=True)
-        #
-        #     if ndcg5 > best_ndcg:
-        #         best_ndcg = ndcg5
-        #         best_epoch = epoch + 1
-        #         patience = self.early_stop
-        #     else:
-        #         patience -= 1
-        #         if patience == 0:
-        #             break
-        # print('epoch of best ndcg@5({:5.4f})'.format(best_ndcg), best_epoch, flush=True)
+            # evaluate phase
+            ndcg5_list = []
+            recall5_list = []
+            precision5_list = []
+            f1_list = []
+            oneCall_list = []
+            auc_list = []
 
+            self.model.eval()
+            with torch.no_grad():
+                for batch in self.test_data:
+                    batch_dict = dict([(k, v[0].float().to(self.device)) for k, v in batch.items()])
+                    users = batch_dict['user'].int()
+                    items = batch_dict['item'].int()
+                    ratings = batch_dict['ratings']
 
+                    # scores -> tensor(20): 一维tensor
+                    scores = self.model({'user': users, 'item': items})
+                    # scores[users, items] = -np.inf
+                    # recon_batch = scores.cpu().numpy()
+                    # ratings = ratings.cpu().numpy()
+
+                    # n_5 = NDCG_binary_at_k_batch(recon_batch, ratings, 5)
+                    n_5 = calculate_ndcg(scores, ratings, 5)
+                    # r_5, p_5, f_5, o_5 = Recall_Precision_F1_OneCall_at_k_batch(recon_batch, ratings, 5)
+                    r_5, p_5, f_5, o_5 = calculate_Recall_Preision_F1_OneCall(scores, ratings, 5)
+                    # auc_b = AUC_at_k_batch(users.cpu().numpy(), recon_batch, ratings)
+                    auc_b = calculate_AUC_at_k(scores, ratings, 5)
+
+                    ndcg5_list.append(np.atleast_1d(n_5))
+                    recall5_list.append(np.atleast_1d(r_5))
+                    precision5_list.append(np.atleast_1d(p_5))
+                    f1_list.append(np.atleast_1d(f_5))
+                    oneCall_list.append(np.atleast_1d(o_5))
+                    auc_list.append(np.atleast_1d(auc_b))
+
+            ndcg5_list = np.concatenate(ndcg5_list)
+            recall5_list = np.concatenate(recall5_list)
+            precision5_list = np.concatenate(precision5_list)
+            f1_list = np.concatenate(f1_list)
+            oneCall_list = np.concatenate(oneCall_list)
+            auc_list = np.concatenate(auc_list)
+
+            ndcg5_list[np.isnan(ndcg5_list)] = 0
+            ndcg5 = np.mean(ndcg5_list)
+            recall5_list[np.isnan(recall5_list)] = 0
+            recall5 = np.mean(recall5_list)
+            precision5_list[np.isnan(precision5_list)] = 0
+            precision5 = np.mean(precision5_list)
+            f1_list[np.isnan(f1_list)] = 0
+            f1 = np.mean(f1_list)
+            oneCall_list[np.isnan(oneCall_list)] = 0
+            oneCAll = np.mean(oneCall_list)
+            auc_list[np.isnan(auc_list)] = 0
+            auc = np.mean(auc_list)
+
+            print(
+                "Epoch: {:3d} | Pre@5: {:5.4f} | Rec@5: {:5.4f} | F1@5: {:5.4f} | NDCG@5: {:5.4f} | 1-call@5: {:5.4f} | AUC: {:5.4f}".format(
+                    epoch + 1, precision5, recall5, f1, ndcg5, oneCAll, auc), flush=True)
+
+            if ndcg5 > best_ndcg:
+                best_ndcg = ndcg5
+                best_epoch = epoch + 1
+                patience = self.early_stop
+            else:
+                patience -= 1
+                if patience == 0:
+                    break
+        print('epoch of best ndcg@5({:5.4f})'.format(best_ndcg), best_epoch, flush=True)
+
+        # 打印出预测值和真实值进行比较
+        prection = []
+        real_score = []
+        with torch.no_grad():
+            for batch in self.test_data:
+                batch_dict = dict([(k, v[0].float().to(self.device)) for k, v in batch.items()])
+                users = batch_dict['user'].int()
+                items = batch_dict['item'].int()
+                ratings = batch_dict['ratings']
+                scores = self.model({'user': users, 'item': items})
+                prection.append(scores.tolist())
+                real_score.append(ratings.tolist())
+            print("预测值为:", np.array(prection))
+            print("真实值为:", np.array(real_score))
+
+        # calculate the calculated amount and size of the model
+        getModelSize(self.model)
+        getModelCal(self.m, self.n, self.hiddenDim)

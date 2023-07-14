@@ -1,14 +1,14 @@
 import numpy as np
 import bottleneck as bn
-from torchsummary import summary
 import torch
 
 def calculate_ndcg(scores, ratings, k):
-    # 将预测评分和真实评分按降序排序
+    # 将预测评分按降序排序，通过得到的序列对ratings继续排序，相当于得出了相关度rel-i
     _, sorted_indices = torch.sort(scores, descending=True)
     sorted_ratings = ratings[sorted_indices]
 
     # 计算 Discounted Cumulative Gain (DCG)
+    # dcg = rel-i / log2(i+1)
     dcg = (sorted_ratings / torch.log2(torch.arange(2, len(sorted_ratings) + 2).float())).cumsum(dim=0)
 
     # 计算 Idealized Discounted Cumulative Gain (IDCG)
@@ -31,7 +31,7 @@ def calculate_Recall_Preision_F1_OneCall(scores, ratings, k=5):
     scores = scores.cpu().numpy()
 
     # 计算预测评分和真实评分同时为True的数量
-    true_positive = np.logical_and(scores[topk_indices] > 0, ratings[topk_indices] > 0).sum()
+    true_positive = np.logical_and(np.abs(scores[topk_indices] - ratings[topk_indices]) <= 1, ratings[topk_indices] > 0).sum()
 
     # 计算真实评分为True的数量
     actual_positive = np.sum(ratings > 0)
@@ -40,9 +40,11 @@ def calculate_Recall_Preision_F1_OneCall(scores, ratings, k=5):
     predicted_positive = np.sum(scores > 0)
 
     # 计算召回率（Recall）
+    # 预测的物品中用户需要的数量 / 用户需要的物品总数
     recall = true_positive / actual_positive if actual_positive > 0 else 0.0
 
     # 计算精确率（Precision）
+    # 预测的物品中用户需要的数量 / 为用户预测的物品的总量
     precision = true_positive / predicted_positive if predicted_positive > 0 else 0.0
 
     # 计算F1值
@@ -157,10 +159,14 @@ def getModelSize(model):
     return (param_size, param_sum, buffer_size, buffer_sum, all_size)
 
 # 获得模型的计算量
-def getModelCal(model, batch_size, user_num, item_num):
-    # 打印模型的摘要信息，包括参数量和计算量
-    # TODO: summary函数的输入参数不正确！
-    summary(model, input_size=[(batch_size, user_num), (batch_size, item_num)])
+def getModelCal(user_num, item_num, hidden_dim):
+    # 根据计算矩阵分解模型的乘法操作数量来近似估计矩阵分解模型的计算量
+
+    multiply_operation = (user_num * item_num * hidden_dim)
+
+    print('模型近似计算量为：{:.3f}'.format(multiply_operation))
+
+    return multiply_operation
 
 if __name__ == '__main__':
     # 示例数据
