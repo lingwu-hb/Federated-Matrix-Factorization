@@ -92,6 +92,7 @@ class centralizedMF:
             oneCall_list = np.concatenate(oneCall_list)
             auc_list = np.concatenate(auc_list)
 
+            # TODO: 增加方差
             ndcg5_list[np.isnan(ndcg5_list)] = 0
             ndcg5 = np.mean(ndcg5_list)
             recall5_list[np.isnan(recall5_list)] = 0

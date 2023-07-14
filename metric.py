@@ -143,6 +143,7 @@ def AUC_at_k_batch(X_train, X_pred, heldout_batch):
     return aucs
 
 # 计算模型的大小
+# TODO: 增加一个计算通讯量
 def getModelSize(model):
     param_size = 0
     param_sum = 0
@@ -159,6 +160,7 @@ def getModelSize(model):
     return (param_size, param_sum, buffer_size, buffer_sum, all_size)
 
 # 获得模型的计算量
+# TODO: Flops 计算
 def getModelCal(user_num, item_num, hidden_dim):
     # 根据计算矩阵分解模型的乘法操作数量来近似估计矩阵分解模型的计算量
 
