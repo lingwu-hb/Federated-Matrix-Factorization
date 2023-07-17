@@ -2,8 +2,6 @@ import os.path
 from sklearn.model_selection import train_test_split
 import numpy as np
 import pandas as pd
-from scipy import sparse
-import torch
 from torch.utils.data import Dataset
 
 FilePath = "data/ml-latest-small/ratings.csv"
@@ -18,8 +16,28 @@ class TrainDataset(Dataset):
         # data = pd.read_csv(os.path.join(path, FilePath2), sep='::', engine='python', header=None,
         #                    names=['userId', 'movieId', 'rating', 'timestamp'])
         # movieLens-100k dataset
+        # data = pd.read_csv(os.path.join(path, FilePath3), sep='\t', engine='python', header=None,
+        #                    names=['userId', 'movieId', 'rating', 'timestamp'])
+
+        # TODO: need to modify
+        # 读取CSV文件
+        path = os.path.abspath(".")
         data = pd.read_csv(os.path.join(path, FilePath3), sep='\t', engine='python', header=None,
-                           names=['userId', 'movieId', 'rating', 'timestamp'])
+                         names=['userId', 'movieId', 'rating', 'timestamp'])
+
+        # 获取用户数量和电影数量
+        n_users = data['userId'].max()
+        n_movies = data['movieId'].max()
+
+        # 创建用户-电影评分矩阵
+        ratings_matrix = np.zeros((n_users, n_movies))
+
+        # 遍历数据框，填充评分矩阵
+        for _, row in data.iterrows():
+            user = row['userId'] - 1  # 将用户ID减1，使其从0开始
+            movie = row['movieId'] - 1  # 将电影ID减1，使其从0开始
+            ratings_matrix[user, movie] = 1
+
         self.train_dataset, _ = train_test_split(data, test_size=0.2)
         self.n = self.train_dataset.userId.max()
         self.m = self.train_dataset.movieId.max()
@@ -84,5 +102,29 @@ def readFile():
     train_dataset, test_dataset = train_test_split(data, test_size=0.2)
     print(train_dataset.userId.max(), train_dataset.movieId.max())
 
+def gptcode():
+    # 读取CSV文件
+    path = os.path.abspath(".")
+    df = pd.read_csv(os.path.join(path, FilePath3), sep='\t', engine='python', header=None,
+                       names=['userId', 'movieId', 'rating', 'timestamp'])
+
+    # 获取用户数量和电影数量
+    n_users = df['userId'].max()
+    n_movies = df['movieId'].max()
+
+    # 创建用户-电影评分矩阵
+    ratings_matrix = np.zeros((n_users, n_movies))
+
+    # 遍历数据框，填充评分矩阵
+    for _, row in df.iterrows():
+        user = row['userId'] - 1  # 将用户ID减1，使其从0开始
+        movie = row['movieId'] - 1  # 将电影ID减1，使其从0开始
+        ratings_matrix[user, movie] = 1
+
+    # 打印评分矩阵
+    print(ratings_matrix)
+
+
 if __name__ == '__main__':
-    readFile()
+    # readFile()
+    gptcode()
