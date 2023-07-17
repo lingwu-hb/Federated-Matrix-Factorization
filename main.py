@@ -23,6 +23,9 @@ def cenMFmain():
     cenMF.train()
 
 if __name__ == '__main__':
-    # cenMFmain()
-    main()
+    test = 1
+    if test == 1:
+        cenMFmain()
+    elif test == 2:
+        main()
 

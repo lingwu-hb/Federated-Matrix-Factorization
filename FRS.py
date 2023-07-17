@@ -4,7 +4,7 @@ import numpy as np
 from model import MFModel
 from dataset import TrainDataset, TestDataset, ClientsSampler
 from metric import *
-
+from evaluate import evaluateModel
 
 class Clients:
     def __init__(self, args):
@@ -101,68 +101,11 @@ class Server:
                 all_loss += loss
             print('epoch%d - loss%f' % (epoch, all_loss / self.n))
 
-            # evaluate phase
-            ndcg5_list = []
-            recall5_list = []
-            precision5_list = []
-            f1_list = []
-            oneCall_list = []
-            auc_list = []
+            # eva-function(self.model, self.test_data) -> ndcg5_mean
+            ndcg5_mean = evaluateModel(self.model, epoch, self.test_data, self.device)
 
-            self.model.eval()
-            with torch.no_grad():
-                for batch in self.test_data:
-                    batch_dict = dict([(k, v[0].float().to(self.device)) for k, v in batch.items()])
-                    users = batch_dict['user'].int()
-                    items = batch_dict['item'].int()
-                    ratings = batch_dict['ratings']
-
-                    # scores -> tensor(20): 一维tensor
-                    scores = self.model({'user': users, 'item': items})
-                    # scores[users, items] = -np.inf
-                    # recon_batch = scores.cpu().numpy()
-                    # ratings = ratings.cpu().numpy()
-
-                    # n_5 = NDCG_binary_at_k_batch(recon_batch, ratings, 5)
-                    n_5 = calculate_ndcg(scores, ratings, 5)
-                    # r_5, p_5, f_5, o_5 = Recall_Precision_F1_OneCall_at_k_batch(recon_batch, ratings, 5)
-                    r_5, p_5, f_5, o_5 = calculate_Recall_Preision_F1_OneCall(scores, ratings, 5)
-                    # auc_b = AUC_at_k_batch(users.cpu().numpy(), recon_batch, ratings)
-                    auc_b = calculate_AUC_at_k(scores, ratings, 5)
-
-                    ndcg5_list.append(np.atleast_1d(n_5))
-                    recall5_list.append(np.atleast_1d(r_5))
-                    precision5_list.append(np.atleast_1d(p_5))
-                    f1_list.append(np.atleast_1d(f_5))
-                    oneCall_list.append(np.atleast_1d(o_5))
-                    auc_list.append(np.atleast_1d(auc_b))
-
-            ndcg5_list = np.concatenate(ndcg5_list)
-            recall5_list = np.concatenate(recall5_list)
-            precision5_list = np.concatenate(precision5_list)
-            f1_list = np.concatenate(f1_list)
-            oneCall_list = np.concatenate(oneCall_list)
-            auc_list = np.concatenate(auc_list)
-
-            ndcg5_list[np.isnan(ndcg5_list)] = 0
-            ndcg5 = np.mean(ndcg5_list)
-            recall5_list[np.isnan(recall5_list)] = 0
-            recall5 = np.mean(recall5_list)
-            precision5_list[np.isnan(precision5_list)] = 0
-            precision5 = np.mean(precision5_list)
-            f1_list[np.isnan(f1_list)] = 0
-            f1 = np.mean(f1_list)
-            oneCall_list[np.isnan(oneCall_list)] = 0
-            oneCAll = np.mean(oneCall_list)
-            auc_list[np.isnan(auc_list)] = 0
-            auc = np.mean(auc_list)
-
-            print(
-                "Epoch: {:3d} | Pre@5: {:5.4f} | Rec@5: {:5.4f} | F1@5: {:5.4f} | NDCG@5: {:5.4f} | 1-call@5: {:5.4f} | AUC: {:5.4f}".format(
-                    epoch + 1, precision5, recall5, f1, ndcg5, oneCAll, auc), flush=True)
-
-            if ndcg5 > best_ndcg:
-                best_ndcg = ndcg5
+            if ndcg5_mean > best_ndcg:
+                best_ndcg = ndcg5_mean
                 best_epoch = epoch + 1
                 patience = self.early_stop
             else:
