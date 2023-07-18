@@ -1,5 +1,5 @@
 import numpy as np
-import bottleneck as bn
+from sklearn.metrics import roc_auc_score
 import torch
 
 def calculate_ndcg(scores, ratings, k):
@@ -31,7 +31,7 @@ def calculate_Recall_Preision_F1_OneCall(scores, ratings, k=5):
     scores = scores.cpu().numpy()
 
     # 计算预测评分和真实评分同时为True的数量
-    true_positive = np.logical_and(np.abs(scores[topk_indices] - ratings[topk_indices]) <= 1, ratings[topk_indices] > 0).sum()
+    true_positive = np.logical_and(scores[topk_indices] > 0, ratings[topk_indices] > 0).sum()
 
     # 计算真实评分为True的数量
     actual_positive = np.sum(ratings > 0)
@@ -55,7 +55,6 @@ def calculate_Recall_Preision_F1_OneCall(scores, ratings, k=5):
 
     return recall, precision, f1, one_call
 
-# TODO: modify the auc calculation
 def calculate_AUC_at_k(scores, ratings, k=5):
     # 获取排名前k个预测评分的索引
     topk_indices = torch.topk(scores, k).indices
@@ -68,31 +67,16 @@ def calculate_AUC_at_k(scores, ratings, k=5):
     hit_matrix = np.zeros_like(scores_np, dtype=bool)
     hit_matrix[topk_indices] = True
 
-    # 计算正样本和负样本的数量
-    pos_samples = ratings_np > 0
-    neg_samples = ratings_np == 0
+    # 检查是否存在多个类别
+    unique_labels = np.unique(ratings_np)
+    if len(unique_labels) < 2:
+        # 只有一个类别，返回默认的AUC值或其他适当的值
+        auc = 0.5  # 默认为0.5，表示随机预测
+    else:
+        # 计算 AUC
+        auc = roc_auc_score(ratings_np, scores_np)
 
-    # 计算每个正样本的 AUC
-    aucs = []
-    for i, pos in enumerate(pos_samples):
-        if pos:
-            # 计算每个正样本的排名
-            rank = np.sum(hit_matrix[:i + 1])
-
-            # 计算每个正样本前面的负样本数量
-            num_neg = np.sum(neg_samples[:i + 1])
-
-            # 计算每个正样本的 AUC
-            if num_neg != 0:
-                auc = (rank - num_neg) / (k * num_neg)
-            else:
-                auc = 0.0
-            aucs.append(auc)
-
-    # 计算平均 AUC
-    mean_auc = np.mean(aucs)
-
-    return mean_auc
+    return auc
 
 # 计算模型的大小
 # TODO: 增加一个计算通讯量

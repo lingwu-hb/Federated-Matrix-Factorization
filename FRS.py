@@ -58,7 +58,8 @@ class Server:
             batch_size=self.batch_size,
             num_workers=2,
             pin_memory=True,
-            shuffle=False)
+            shuffle=False,
+            drop_last=True)
         self.model = MFModel(self.n, self.m, self.hiddenDim)
         self.model.to(self.device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=args.lr)

@@ -1,6 +1,4 @@
 # 集中式矩阵分解算法
-import torch
-import numpy as np
 from torch.utils.data import DataLoader
 from dataset import TrainDataset, TestDataset
 from model import MFModel
@@ -23,7 +21,8 @@ class centralizedMF:
             batch_size=self.batch_size,
             num_workers=2,
             pin_memory=True,
-            shuffle=False)
+            shuffle=False,
+            drop_last=True)
         self.model = MFModel(self.n, self.m, self.hiddenDim)
         self.model.to(self.device)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=args.lr)
@@ -35,7 +34,10 @@ class centralizedMF:
         for epoch in range(self.epochs):
             self.model.train()
             all_loss = 0
-            dataBatch = DataLoader(self.trainData, batch_size=self.batch_size, shuffle=True)
+            dataBatch = DataLoader(self.trainData,
+                                   batch_size=self.batch_size,
+                                   shuffle=True,
+                                   drop_last=True)
             for batch in dataBatch:
                 # 直接调用model函数，会调用模型的forward函数，返回对结果的预测值
                 scores = self.model(dict([(k, v[0].float().to(self.device)) for k, v in batch.items()]))
